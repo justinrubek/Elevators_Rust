@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::LinkedList;
 use std::collections::VecDeque;
 
 struct Floor {
@@ -119,7 +118,7 @@ impl Building {
   pub fn new(floor_count: usize) -> Building {
     let mut floors = Vec::with_capacity(floor_count);
 
-    for floor in 0..floor_count {
+    for _ in 0..floor_count {
       floors.push(Floor::new());
     }
 
@@ -127,7 +126,7 @@ impl Building {
   }
 
   pub fn is_empty(&self) -> bool {
-    for floor in self.floors.iter() {
+    for floor in &self.floors {
       if floor.has_waiting() {
         return false;
       }
@@ -159,18 +158,16 @@ impl Sim {
 
       // Check which direction to go
       // Currently just goes up and down (cocktail shaker)
-      match self.can_move_direction(&direction) {
-        false => direction.swap(),
-        true => {},
+      if !self.can_move_direction(&direction) {
+        direction.swap();
       }
 
       // Dismiss Passengers
       let mut to_dismiss_indexes = Vec::with_capacity(self.elevator.people.capacity());
 
       for (i, person) in self.elevator.people.iter().enumerate() {
-        match person.destination.cmp(&current_floor) {
-          Ordering::Equal => { to_dismiss_indexes.push(i); },
-          _ => {},
+        if let Ordering::Equal = person.destination.cmp(&current_floor) {
+          to_dismiss_indexes.push(i); 
         }
       }
 
