@@ -1,6 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 struct Floor {
   arrived: VecDeque<Person>,
   up: VecDeque<Person>,
@@ -178,20 +182,25 @@ impl Sim {
       }
 
       // Pickup new passengers
+      // TODO: Elevator will continue grab people when it originally has space and runs out
       if self.elevator.has_space() {
         match direction {
           Direction::Up => {
-            while !self.building.floors[current_floor].up.is_empty() {
-              let person = self.building.floors[current_floor].up.pop_front().unwrap();
-              println!("{} gets on the elevator at floor {}", person.name, current_floor);
-              self.elevator.people.push(person);
+            while self.elevator.has_space() && !self.building.floors[current_floor].up.is_empty() {
+              // If there is a person there (Could be a while, then not do the empty check above, I think)
+              if let Some(person) = self.building.floors[current_floor].up.pop_front() {
+                println!("{} gets on the elevator at floor {}", person.name, current_floor);
+                self.elevator.people.push(person);
+              }
             }
           },
           Direction::Down => {
-            while !self.building.floors[current_floor].down.is_empty() {
-              let person = self.building.floors[current_floor].down.pop_front().unwrap();
-              println!("{} gets on the elevator at floor {}", person.name, current_floor);
-              self.elevator.people.push(person);
+            while self.elevator.has_space() && !self.building.floors[current_floor].down.is_empty() {
+
+              if let Some(person) = self.building.floors[current_floor].down.pop_front() {
+                println!("{} gets on the elevator at floor {}", person.name, current_floor);
+                self.elevator.people.push(person);
+              }
             }
           },
           _ => {},
@@ -225,15 +234,55 @@ impl Sim {
 
 }
 
+impl Sim {
+  pub fn add_person(&mut self, floor: & usize, person: Person) {
+    // TODO: Build a request
+
+    match person.direction(*floor) {
+      Direction::Up => { self.building.floors[*floor].add_up(person); },
+      Direction::Down => { self.building.floors[*floor].add_down(person); },
+      Direction::None => {},
+    }
+  }
+}
+
+fn load_people_from_file(file_path: &str, sim: &mut Sim) -> bool {
+  
+  // Populate sim with people
+  let file_path = Path::new(file_path);
+  let mut file = match File::open(&file_path) {
+    Ok(file) => file,
+    Err(_) => { return false; },
+  };
+
+  let mut text = String::new();
+  file.read_to_string(&mut text);
+
+  let mut lines = text.lines();
+  let count: usize = lines.next().unwrap().parse().unwrap();
+
+  for _ in 0..count {
+    let mut properties = lines.next().unwrap().split_whitespace();
+
+    let destination: usize = properties.next().unwrap().parse().unwrap();
+    let name = String::from(properties.next().unwrap());
+    let starting_floor: usize = properties.next().unwrap().parse().unwrap();
+
+    let p = Person { destination: destination, name: name };
+    sim.add_person(&starting_floor, p);
+  }
+  true
+}
+
 fn main() {
 
   let mut sim = Sim::new();
+  let loaded = load_people_from_file("people.txt", &mut sim);
 
-  // Populate sim with people
-  let p = Person { destination: 4, name: String::from("Bob") };
-
-  sim.building.floors[2].add_up(p);
-
+  if !loaded {
+    // Prompt for people to populate
+    panic!("File 'people.txt' not found");
+  }
   
   // Run and display the count
   let count = sim.run();
